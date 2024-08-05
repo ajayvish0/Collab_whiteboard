@@ -1,6 +1,10 @@
-import { useRef, useState } from "react";
-
+import { useRef, useState, useEffect } from "react";
+import io from "socket.io-client";
+import { useParams, useNavigate } from "react-router-dom";
+const socket = io("http://localhost:3000");
 const CanvasDrawing = () => {
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
   const svgRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState(null);
@@ -9,6 +13,43 @@ const CanvasDrawing = () => {
   const [color, setColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(2);
 
+  useEffect(() => {
+    if (!sessionId) {
+      createNewSession();
+    } else {
+      joinSession(sessionId);
+    }
+
+    socket.on("draw", (newPath) => {
+      setPaths((prevPaths) => [...prevPaths, newPath]);
+    });
+
+    socket.on("clear", () => {
+      setPaths([]);
+    });
+
+    socket.on("load-canvas", (loadedPaths) => {
+      setPaths(loadedPaths);
+    });
+
+    return () => {
+      socket.off("draw");
+      socket.off("clear");
+      socket.off("load-canvas");
+    };
+  }, [sessionId]);
+
+  const createNewSession = async () => {
+    const response = await fetch("http://localhost:3000/create-session", {
+      method: "POST",
+    });
+    const data = await response.json();
+    navigate(`/session/${data.sessionId}`);
+  };
+
+  const joinSession = (sessionId) => {
+    socket.emit("join-session", sessionId);
+  };
   const startDrawing = (e) => {
     const point = getCoordinates(e);
     setCurrentPath(`M ${point.x} ${point.y}`);
@@ -25,10 +66,12 @@ const CanvasDrawing = () => {
     if (isDrawing) {
       setIsDrawing(false);
       if (currentPath) {
+        const newPath = { d: currentPath, stroke: color, strokeWidth, tool };
         setPaths((prevPaths) => [
           ...prevPaths,
           { d: currentPath, stroke: color, strokeWidth, tool },
         ]);
+        socket.emit("draw", { sessionId, path: newPath });
         setCurrentPath(null);
       }
     }
@@ -45,6 +88,7 @@ const CanvasDrawing = () => {
 
   const handleClear = () => {
     setPaths([]);
+    socket.emit("clear", sessionId);
   };
 
   return (
