@@ -6,17 +6,24 @@ import { v4 as uuidv4 } from "uuid";
 
 const app = express();
 app.use(express.json());
+const allowedOrigins = [
+  "https://collaoboard.netlify.app",
+  "http://localhost:5173",
+];
 app.use(
   cors({
-    origin: ["https://collaoboard.netlify.app/", "http://localhost:5173"],
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
   })
 );
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["https://collaoboard.netlify.app/", "http://localhost:5173"], // Replace with your React app's URL
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
