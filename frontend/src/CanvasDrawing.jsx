@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import io from "socket.io-client";
 import { useParams } from "react-router-dom";
 
-const socket = io("http://localhost:3000");
+const socket = io("https://collab-whiteboard-5uu2.onrender.com/");
 const CanvasDrawing = () => {
   const { sessionId } = useParams();
   const svgRef = useRef(null);
