@@ -3,6 +3,7 @@ import { useState } from "react";
 
 const CreateSessionButton = () => {
   const [sessionUrl, setSessionUrl] = useState("");
+  console.log(window.location.origin);
 
   const createSession = async () => {
     try {

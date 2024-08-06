@@ -6,12 +6,16 @@ import { v4 as uuidv4 } from "uuid";
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://collaoboard.netlify.app/",
+  })
+);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173", // Replace with your React app's URL
+    origin: ["https://collaoboard.netlify.app/", "http://localhost:5173"], // Replace with your React app's URL
     methods: ["GET", "POST"],
   },
 });
@@ -56,7 +60,8 @@ io.on("connection", (socket) => {
     console.log("user disconnected");
   });
 });
+const PORT = process.env.PORT || 3000;
 
-httpServer.listen(3000, () => {
+httpServer.listen(PORT, () => {
   console.log("Server is running on port 3000");
 });
