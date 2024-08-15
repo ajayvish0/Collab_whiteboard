@@ -4,16 +4,13 @@ import { useState } from "react";
 const CreateSessionButton = () => {
   const [sessionUrl, setSessionUrl] = useState("");
   console.log(window.location.origin);
-
+  //https://collab-whiteboard-5uu2.onrender.com/ ==> use for deployment
   const createSession = async () => {
     try {
       console.log("helo");
-      const response = await fetch(
-        "https://collab-whiteboard-5uu2.onrender.com/create-session",
-        {
-          method: "POST",
-        }
-      );
+      const response = await fetch("http://localhost:3000/create-session", {
+        method: "POST",
+      });
       const data = await response.json();
       setSessionUrl(`${window.location.origin}/session/${data.sessionId}`);
     } catch (error) {
