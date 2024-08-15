@@ -1,7 +1,7 @@
 // App.js
 
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-
+import "dotenv/config";
 import Share from "./components/Share";
 import CanvasDrawing from "./CanvasDrawing";
 
