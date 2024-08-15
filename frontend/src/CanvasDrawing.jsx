@@ -1,21 +1,8 @@
-import { useEffect, useRef, useCallback } from "react";
-import {
-  colorState,
-  currentPathState,
-  currentShapeState,
-  isDrawingState,
-  pathsState,
-  startPositionState,
-  strokeWidthState,
-  textState,
-  toolState,
-} from "./atoms/recoil";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Toolbar from "./components/Toolbar";
-import { useRecoilState } from "recoil";
 import io from "socket.io-client";
 import { useParams } from "react-router-dom";
-// "https://collab-whiteboard-5uu2.onrender.com"
-// Initialize socket connection
+
 const socket = io("https://collab-whiteboard-5uu2.onrender.com", {
   withCredentials: true,
 });
@@ -24,15 +11,18 @@ const CanvasDrawing = () => {
   const svgRef = useRef(null);
   const { sessionId } = useParams();
 
-  const [isDrawing, setIsDrawing] = useRecoilState(isDrawingState);
-  const [currentPath, setCurrentPath] = useRecoilState(currentPathState);
-  const [paths, setPaths] = useRecoilState(pathsState);
-  const [tool, setTool] = useRecoilState(toolState);
-  const [color, setColor] = useRecoilState(colorState);
-  const [strokeWidth, setStrokeWidth] = useRecoilState(strokeWidthState);
-  const [startPosition, setStartPosition] = useRecoilState(startPositionState);
-  const [currentShape, setCurrentShape] = useRecoilState(currentShapeState);
-  const [text, setText] = useRecoilState(textState);
+  const [drawingState, setDrawingState] = useState({
+    isDrawing: false,
+    currentPath: null,
+    currentShape: null,
+    startPosition: null,
+  });
+
+  const [paths, setPaths] = useState([]);
+  const [tool, setTool] = useState("pencil");
+  const [color, setColor] = useState("#000000");
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [text, setText] = useState("");
 
   useEffect(() => {
     socket.emit("join-session", sessionId);
@@ -54,70 +44,88 @@ const CanvasDrawing = () => {
       socket.off("clear");
       socket.off("load-canvas");
     };
-  }, [sessionId, setPaths]);
+  }, [sessionId]);
+
+  const getCoordinates = useCallback((e) => {
+    const svg = svgRef.current;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }, []);
 
   const startDrawing = useCallback(
     (e) => {
       const point = getCoordinates(e);
-      setIsDrawing(true);
-      setStartPosition(point);
-
-      if (["rectangle", "circle", "text"].includes(tool)) {
-        setCurrentShape({ x: point.x, y: point.y, width: 0, height: 0 });
-      } else {
-        setCurrentPath(`M ${point.x} ${point.y}`);
-      }
+      setDrawingState((prev) => ({
+        ...prev,
+        isDrawing: true,
+        startPosition: point,
+        currentPath: ["rectangle", "circle", "text"].includes(tool)
+          ? null
+          : `M ${point.x} ${point.y}`,
+        currentShape: ["rectangle", "circle", "text"].includes(tool)
+          ? { x: point.x, y: point.y, width: 0, height: 0 }
+          : null,
+      }));
     },
-    [tool, setIsDrawing, setStartPosition, setCurrentShape, setCurrentPath]
+    [tool, getCoordinates]
   );
 
   const draw = useCallback(
     (e) => {
-      if (!isDrawing) return;
+      if (!drawingState.isDrawing) return;
       const point = getCoordinates(e);
 
-      if (["rectangle", "circle"].includes(tool)) {
-        const width = point.x - startPosition.x;
-        const height = point.y - startPosition.y;
-        setCurrentShape({
-          x: width < 0 ? point.x : startPosition.x,
-          y: height < 0 ? point.y : startPosition.y,
-          width: Math.abs(width),
-          height: Math.abs(height),
-          rx: tool === "rectangle" ? 10 : Math.abs(width / 2),
-          ry: tool === "rectangle" ? 10 : Math.abs(height / 2),
-        });
-      } else {
-        setCurrentPath((prev) => `${prev} L ${point.x} ${point.y}`);
-      }
+      setDrawingState((prev) => {
+        if (["rectangle", "circle"].includes(tool)) {
+          const width = point.x - prev.startPosition.x;
+          const height = point.y - prev.startPosition.y;
+          return {
+            ...prev,
+            currentShape: {
+              x: width < 0 ? point.x : prev.startPosition.x,
+              y: height < 0 ? point.y : prev.startPosition.y,
+              width: Math.abs(width),
+              height: Math.abs(height),
+              rx: tool === "rectangle" ? 10 : Math.abs(width / 2),
+              ry: tool === "rectangle" ? 10 : Math.abs(height / 2),
+            },
+          };
+        } else {
+          return {
+            ...prev,
+            currentPath: `${prev.currentPath} L ${point.x} ${point.y}`,
+          };
+        }
+      });
     },
-    [isDrawing, tool, startPosition, setCurrentShape, setCurrentPath]
+    [drawingState.isDrawing, tool, getCoordinates]
   );
 
   const stopDrawing = useCallback(() => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
+    if (!drawingState.isDrawing) return;
 
     let newPath;
-    if (["rectangle", "circle"].includes(tool) && currentShape) {
+    if (["rectangle", "circle"].includes(tool) && drawingState.currentShape) {
       newPath = {
-        ...currentShape,
+        ...drawingState.currentShape,
         stroke: color,
         strokeWidth,
         tool,
       };
-    } else if (tool === "text" && text && currentShape) {
+    } else if (tool === "text" && text && drawingState.currentShape) {
       newPath = {
-        x: currentShape.x,
-        y: currentShape.y,
+        x: drawingState.currentShape.x,
+        y: drawingState.currentShape.y,
         text,
         color,
         tool,
       };
       setText("");
-    } else if (currentPath) {
+    } else if (drawingState.currentPath) {
       newPath = {
-        d: currentPath,
+        d: drawingState.currentPath,
         stroke: color,
         strokeWidth,
         tool,
@@ -129,40 +137,20 @@ const CanvasDrawing = () => {
       socket.emit("draw", { sessionId, path: newPath });
     }
 
-    setCurrentPath(null);
-    setCurrentShape(null);
-    setStartPosition(null);
-  }, [
-    isDrawing,
-    tool,
-    currentShape,
-    currentPath,
-    color,
-    strokeWidth,
-    text,
-    sessionId,
-    setPaths,
-    setIsDrawing,
-    setCurrentPath,
-    setCurrentShape,
-    setStartPosition,
-    setText,
-  ]);
+    setDrawingState({
+      isDrawing: false,
+      currentPath: null,
+      currentShape: null,
+      startPosition: null,
+    });
+  }, [drawingState, tool, color, strokeWidth, text, sessionId]);
 
-  const getCoordinates = (e) => {
-    const svg = svgRef.current;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    return pt.matrixTransform(svg.getScreenCTM().inverse());
-  };
-
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setPaths([]);
     socket.emit("clear", sessionId);
-  };
+  }, [sessionId]);
 
-  const renderPath = (path, index) => {
+  const renderPath = useCallback((path, index) => {
     switch (path.tool) {
       case "pencil":
       case "eraser":
@@ -218,7 +206,12 @@ const CanvasDrawing = () => {
       default:
         return null;
     }
-  };
+  }, []);
+
+  const memoizedPaths = useMemo(
+    () => paths.map(renderPath),
+    [paths, renderPath]
+  );
 
   return (
     <div className="flex flex-col h-screen">
@@ -250,44 +243,50 @@ const CanvasDrawing = () => {
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
       >
-        {paths.map(renderPath)}
-        {currentPath && (
+        {memoizedPaths}
+        {drawingState.currentPath && (
           <path
-            d={currentPath}
+            d={drawingState.currentPath}
             stroke={tool === "eraser" ? "#FFFFFF" : color}
             strokeWidth={strokeWidth}
             fill="none"
           />
         )}
-        {currentShape &&
+        {drawingState.currentShape &&
           ["rectangle", "circle"].includes(tool) &&
           (tool === "rectangle" ? (
             <rect
-              x={currentShape.x}
-              y={currentShape.y}
-              width={currentShape.width}
-              height={currentShape.height}
-              rx={currentShape.rx}
-              ry={currentShape.ry}
+              x={drawingState.currentShape.x}
+              y={drawingState.currentShape.y}
+              width={drawingState.currentShape.width}
+              height={drawingState.currentShape.height}
+              rx={drawingState.currentShape.rx}
+              ry={drawingState.currentShape.ry}
               stroke={color}
               strokeWidth={strokeWidth}
               fill="none"
             />
           ) : (
             <ellipse
-              cx={currentShape.x + currentShape.width / 2}
-              cy={currentShape.y + currentShape.height / 2}
-              rx={currentShape.width / 2}
-              ry={currentShape.height / 2}
+              cx={
+                drawingState.currentShape.x +
+                drawingState.currentShape.width / 2
+              }
+              cy={
+                drawingState.currentShape.y +
+                drawingState.currentShape.height / 2
+              }
+              rx={drawingState.currentShape.width / 2}
+              ry={drawingState.currentShape.height / 2}
               stroke={color}
               strokeWidth={strokeWidth}
               fill="none"
             />
           ))}
-        {currentShape && tool === "text" && (
+        {drawingState.currentShape && tool === "text" && (
           <text
-            x={currentShape.x}
-            y={currentShape.y}
+            x={drawingState.currentShape.x}
+            y={drawingState.currentShape.y}
             fill={color}
             fontSize={`${strokeWidth * 5}px`}
           >
