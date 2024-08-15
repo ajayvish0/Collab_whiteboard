@@ -6,7 +6,7 @@ import io from "socket.io-client";
 import { useParams } from "react-router-dom";
 
 // Initialize socket connection
-const socket = io("https://collab-whiteboard-5uu2.onrender.com", {
+const socket = io("https://collab-whiteboard-5uu2.onrender.com ", {
   withCredentials: true,
 });
 
@@ -88,7 +88,7 @@ const CanvasDrawing = () => {
       socket.off("clear");
       socket.off("load-canvas");
     };
-  }, [sessionId, state.paths]);
+  }, [sessionId]);
 
   const startDrawing = (e) => {
     const point = getCoordinates(e);
