@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Toolbar from "./components/Toolbar";
 import io from "socket.io-client";
 import { useParams } from "react-router-dom";
+import { ZoomControls } from "./components/ZoomControls";
 
 const socket = io("https://collab-whiteboard-5uu2.onrender.com", {
   withCredentials: true,
@@ -10,7 +11,8 @@ const socket = io("https://collab-whiteboard-5uu2.onrender.com", {
 const CanvasDrawing = () => {
   const svgRef = useRef(null);
   const { sessionId } = useParams();
-
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [drawingState, setDrawingState] = useState({
     isDrawing: false,
     currentPath: null,
@@ -46,13 +48,16 @@ const CanvasDrawing = () => {
     };
   }, [sessionId]);
 
-  const getCoordinates = useCallback((e) => {
-    const svg = svgRef.current;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    return pt.matrixTransform(svg.getScreenCTM().inverse());
-  }, []);
+  const getCoordinates = useCallback(
+    (e) => {
+      const svg = svgRef.current;
+      const rect = svg.getBoundingClientRect();
+      const x = (e.clientX - rect.left - pan.x) / zoom;
+      const y = (e.clientY - rect.top - pan.y) / zoom;
+      return { x, y };
+    },
+    [zoom, pan]
+  );
 
   const startDrawing = useCallback(
     (e) => {
@@ -70,6 +75,25 @@ const CanvasDrawing = () => {
       }));
     },
     [tool, getCoordinates]
+  );
+
+  const handleWheel = useCallback(
+    (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const mousePoint = getCoordinates(e);
+
+      setZoom((prevZoom) => {
+        const newZoom = Math.min(Math.max(0.1, prevZoom * delta), 5);
+        return newZoom;
+      });
+
+      setPan((prevPan) => ({
+        x: prevPan.x - mousePoint.x * (delta - 1) * zoom,
+        y: prevPan.y - mousePoint.y * (delta - 1) * zoom,
+      }));
+    },
+    [zoom, getCoordinates]
   );
 
   const draw = useCallback(
@@ -214,7 +238,7 @@ const CanvasDrawing = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="relative h-screen  ">
       <Toolbar
         tool={tool}
         setTool={setTool}
@@ -224,76 +248,91 @@ const CanvasDrawing = () => {
         setStrokeWidth={setStrokeWidth}
         handleClear={handleClear}
       />
-      {tool === "text" && (
-        <div className="p-4">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Enter text"
-            className="px-4 py-2 border border-gray-300"
-          />
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        className="flex-grow border border-gray-300"
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-      >
-        {memoizedPaths}
-        {drawingState.currentPath && (
-          <path
-            d={drawingState.currentPath}
-            stroke={tool === "eraser" ? "#FFFFFF" : color}
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
-        )}
-        {drawingState.currentShape &&
-          ["rectangle", "circle"].includes(tool) &&
-          (tool === "rectangle" ? (
-            <rect
-              x={drawingState.currentShape.x}
-              y={drawingState.currentShape.y}
-              width={drawingState.currentShape.width}
-              height={drawingState.currentShape.height}
-              rx={drawingState.currentShape.rx}
-              ry={drawingState.currentShape.ry}
-              stroke={color}
-              strokeWidth={strokeWidth}
-              fill="none"
+
+      <ZoomControls
+        zoom={zoom}
+        setZoom={setZoom}
+        minZoom={0.1}
+        maxZoom={5}
+        zoomStep={0.1}
+      />
+
+      <div className=" w-full h-full">
+        {tool === "text" && (
+          <div className="absolute top-16 left-[100px] p-4 z-4">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Enter text"
+              className="px-4 py-2 border border-gray-300"
             />
-          ) : (
-            <ellipse
-              cx={
-                drawingState.currentShape.x +
-                drawingState.currentShape.width / 2
-              }
-              cy={
-                drawingState.currentShape.y +
-                drawingState.currentShape.height / 2
-              }
-              rx={drawingState.currentShape.width / 2}
-              ry={drawingState.currentShape.height / 2}
-              stroke={color}
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-          ))}
-        {drawingState.currentShape && tool === "text" && (
-          <text
-            x={drawingState.currentShape.x}
-            y={drawingState.currentShape.y}
-            fill={color}
-            fontSize={`${strokeWidth * 5}px`}
-          >
-            {text}
-          </text>
+          </div>
         )}
-      </svg>
+        <svg
+          ref={svgRef}
+          className="w-full h-full"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onWheel={handleWheel}
+          style={{ cursor: tool === "text" ? "text" : "crosshair" }}
+        >
+          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+            {memoizedPaths}
+            {drawingState.currentPath && (
+              <path
+                d={drawingState.currentPath}
+                stroke={tool === "eraser" ? "#FFFFFF" : color}
+                strokeWidth={strokeWidth}
+                fill="none"
+              />
+            )}
+            {drawingState.currentShape &&
+              ["rectangle", "circle"].includes(tool) &&
+              (tool === "rectangle" ? (
+                <rect
+                  x={drawingState.currentShape.x}
+                  y={drawingState.currentShape.y}
+                  width={drawingState.currentShape.width}
+                  height={drawingState.currentShape.height}
+                  rx={drawingState.currentShape.rx}
+                  ry={drawingState.currentShape.ry}
+                  stroke={color}
+                  strokeWidth={strokeWidth}
+                  fill="none"
+                />
+              ) : (
+                <ellipse
+                  cx={
+                    drawingState.currentShape.x +
+                    drawingState.currentShape.width / 2
+                  }
+                  cy={
+                    drawingState.currentShape.y +
+                    drawingState.currentShape.height / 2
+                  }
+                  rx={drawingState.currentShape.width / 2}
+                  ry={drawingState.currentShape.height / 2}
+                  stroke={color}
+                  strokeWidth={strokeWidth}
+                  fill="none"
+                />
+              ))}
+            {drawingState.currentShape && tool === "text" && (
+              <text
+                x={drawingState.currentShape.x}
+                y={drawingState.currentShape.y}
+                fill={color}
+                fontSize={`${strokeWidth * 5}px`}
+              >
+                {text}
+              </text>
+            )}
+          </g>
+        </svg>
+      </div>
     </div>
   );
 };
