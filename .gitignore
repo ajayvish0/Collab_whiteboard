@@ -1,0 +1,6 @@
+node_modules
+.env
+.env.local
+.DS_Store
+# Untracked duplicate clone of this repository
+/Collab_whiteboard/
