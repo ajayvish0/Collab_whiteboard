@@ -1,19 +1,24 @@
-// App.js
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import Board from "./components/Board.jsx";
+import BoardMessage from "./components/BoardMessage.jsx";
+import Landing from "./components/Landing.jsx";
 
-import Share from "./components/Share";
-import CanvasDrawing from "./CanvasDrawing";
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Share />} />
-        <Route path="/session/:sessionId" element={<CanvasDrawing />} />
-      </Routes>
-    </Router>
-  );
+// Links from the first version of the app used /session/<id>.
+function LegacySessionRedirect() {
+  const { boardId } = useParams();
+  return <Navigate to={`/board/${boardId}`} replace />;
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/board/:boardId" element={<Board />} />
+        <Route path="/session/:boardId" element={<LegacySessionRedirect />} />
+        <Route path="*" element={<BoardMessage kind="page" />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
