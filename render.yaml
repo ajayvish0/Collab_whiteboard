@@ -1,0 +1,27 @@
+# Render Blueprint: backend web service + Postgres database.
+# Render free Postgres databases expire after a limited period (check Render docs); for a long-lived free option,
+# point DATABASE_URL at Neon or Supabase instead (set it manually).
+services:
+  - type: web
+    name: teamsketch-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CORS_ORIGINS
+        value: https://collaoboard.netlify.app,https://main--collaoboard.netlify.app
+      - key: DATABASE_URL
+        fromDatabase:
+          name: teamsketch-db
+          property: connectionString
+
+databases:
+  - name: teamsketch-db
+    plan: free
