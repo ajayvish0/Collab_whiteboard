@@ -168,6 +168,8 @@ export function useBoard(boardId, name) {
     if (joinedRef.current) socketRef.current?.volatile.emit(event, payload);
   }, []);
 
+  // volatile() reads refs only when the throttled function is called, not during render.
+  // eslint-disable-next-line react-hooks/refs
   const sendCursor = useMemo(() => throttle((p) => volatile("cursor:move", p), 50), [volatile]);
   const sendLive = useCallback((stroke) => volatile("stroke:live", stroke), [volatile]);
   const endLive = useCallback(

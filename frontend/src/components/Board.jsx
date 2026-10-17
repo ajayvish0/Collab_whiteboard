@@ -73,6 +73,7 @@ function BoardCanvas({ boardId }) {
   const [erasing, setErasing] = useState(EMPTY_SET);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [history, setHistory] = useState(emptyHistory);
+  const [grabbing, setGrabbing] = useState(false);
 
   const gesture = useRef(null);
   const pointers = useRef(new Map());
@@ -82,9 +83,11 @@ function BoardCanvas({ boardId }) {
   const users = useMemo(() => [...board.users.values()], [board.users]);
 
   // Undo history refers to shapes that a clear removed; start fresh.
-  useEffect(() => {
+  const [seenClears, setSeenClears] = useState(remoteClears);
+  if (remoteClears !== seenClears) {
+    setSeenClears(remoteClears);
     if (remoteClears) setHistory(emptyHistory);
-  }, [remoteClears]);
+  }
 
   // ------------------------------------------------------------ operations
   const apply = useCallback(
@@ -143,8 +146,10 @@ function BoardCanvas({ boardId }) {
   );
 
   // ------------------------------------------------------------ live strokes
+  // The throttled callback only reads refs when invoked from pointer handlers.
   const flushLive = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs
       throttle(() => {
         const d = draftRef.current;
         if (!d) return;
@@ -222,6 +227,7 @@ function BoardCanvas({ boardId }) {
       // Second finger: switch to pinch-zoom and drop the stroke in progress.
       discardDraft();
       setErasing(EMPTY_SET);
+      setGrabbing(false);
       const [a, b] = [...pointers.current.values()];
       gesture.current = {
         kind: "pinch",
@@ -235,6 +241,7 @@ function BoardCanvas({ boardId }) {
 
     if (e.button === 1 || tool === "hand" || spaceHeld) {
       gesture.current = { kind: "pan", last: screen };
+      setGrabbing(true);
       return;
     }
     if (e.button !== 0) return;
@@ -325,6 +332,7 @@ function BoardCanvas({ boardId }) {
       return;
     }
     gesture.current = null;
+    if (g.kind === "pan") setGrabbing(false);
 
     if (g.kind === "draw") {
       const d = draftRef.current;
@@ -387,7 +395,7 @@ function BoardCanvas({ boardId }) {
 
   const panning = tool === "hand" || spaceHeld;
   const cursor = panning
-    ? gesture.current?.kind === "pan"
+    ? grabbing
       ? "grabbing"
       : "grab"
     : tool === "text"
