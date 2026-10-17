@@ -17,11 +17,11 @@ function list(value, fallback) {
 export function loadConfig(env = process.env) {
   return {
     port: int(env.PORT, 3000),
-    corsOrigins: list(env.CORS_ORIGINS, ["http://localhost:5173"]),
+    corsOrigins: list(env.CORS_ORIGINS, ["http://localhost:5173", "https://collaoboard.netlify.app"]),
     databaseUrl: env.DATABASE_URL || null,
     // Number of reverse proxies in front of the app (Render uses one), so that
     // rate limiting sees the real client IP.
-    trustProxy: int(env.TRUST_PROXY, 0),
+    trustProxy: int(env.TRUST_PROXY, env.RENDER ? 1 : 0),
     logLevel: env.LOG_LEVEL || "info",
 
     limits: {

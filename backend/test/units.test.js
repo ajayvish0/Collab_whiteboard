@@ -23,6 +23,13 @@ describe("config", () => {
     expect(c.port).toBe(4000);
     expect(c.databaseUrl).toBeNull();
   });
+
+  it("defaults to the production frontend and Render's proxy", () => {
+    const c = loadConfig({ RENDER: "true" });
+    expect(c.corsOrigins).toEqual(["http://localhost:5173", "https://collaoboard.netlify.app"]);
+    expect(c.trustProxy).toBe(1);
+    expect(loadConfig({}).trustProxy).toBe(0);
+  });
 });
 
 describe("schemas", () => {
