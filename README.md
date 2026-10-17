@@ -154,7 +154,7 @@ cd frontend && npm run lint
 cd frontend && npx playwright install chromium && npm run test:e2e
 ```
 
-The end-to-end tests start their own backend and frontend, open **two browser contexts** on the same board and check drawing, live strokes, cursors, erasing, undo, text, reloads, and touch drawing with pinch-zoom on a mobile viewport. The integration tests include regression tests for the bugs found in the [audit](PROJECT_AUDIT_AND_ROADMAP.md) (echoed strokes, silent failures on unknown boards, lost updates after reconnects, unvalidated payloads).
+The end-to-end tests start their own backend and frontend, open **two browser contexts** on the same board and check drawing, live strokes, cursors, erasing, undo, text, reloads, and touch drawing with pinch-zoom on a mobile viewport. The integration tests include regression tests for bugs found in the original code (echoed strokes, silent failures on unknown boards, lost updates after reconnects, unvalidated payloads).
 
 ## Deployment
 
@@ -169,10 +169,6 @@ The end-to-end tests start their own backend and frontend, open **two browser co
 - Concurrent edits to the same shape are last-writer-wins (see consistency model).
 - A single backend instance. Scaling out would need the Socket.IO Redis adapter plus sticky sessions, and a shared store for active boards.
 - Free hosting cold starts (about a minute after 15 idle minutes).
-
-## Roadmap
-
-See [PROJECT_AUDIT_AND_ROADMAP.md](PROJECT_AUDIT_AND_ROADMAP.md) for the original audit. Possible next steps: read-only share links and an owner token for destructive actions, select/move/resize, a dark theme, and an ADR comparing the server-ordered op log with a CRDT (Yjs).
 
 ## License
 
